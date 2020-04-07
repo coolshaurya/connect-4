@@ -1,6 +1,6 @@
 use std::fmt;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Player {
     A,
     B,
@@ -46,7 +46,7 @@ pub enum GameResult {
     Draw,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PieceSpot {
     Empty,
     Player(Player),
@@ -80,11 +80,11 @@ pub struct Board {
 }
 
 impl Board {
-    fn reset(mut self) {
-        self = Self::default();
+    pub fn reset(&mut self) {
+        *self = Self::default();
     }
 
-    fn drop_piece(&mut self, column: usize) {
+    pub fn drop_piece(&mut self, column: usize) {
         let column_top = self.board[column].iter().filter(|&x| x.is_player()).count();
         if column >= 7 || column_top >= 6 {
             panic!("invalid column");
@@ -92,11 +92,15 @@ impl Board {
         self.board[column][column_top] = PieceSpot::Player(self.turn);
     }
 
-    fn switch_turn(&mut self) {
+    fn access(&self, (column, row): (usize, usize)) -> PieceSpot {
+        self.board[column][row]
+    }
+
+    pub fn switch_turn(&mut self) {
         self.turn = self.turn.opposite();
     }
 
-    fn win_sequences(&self) -> Vec<Vec<(usize, usize)>> {
+    pub fn win_sequences() -> Vec<Vec<(usize, usize)>> {
         let is_valid = |column: usize, row: usize| -> bool { column < 7 && row < 6 };
 
         let rows = (0..6).map(|row| {
@@ -157,26 +161,34 @@ impl Board {
         empty_count == 0
     }
 
-    fn is_win(&self) -> bool {
-        for sequence in self.win_sequences() {
+    fn is_win(&self) -> Option<Player> {
+        for sequence in Self::win_sequences() {
             for group_of_4 in sequence.windows(4) {
-                if group_of_4[0] == group_of_4[1]
+                let group_of_4: Vec<PieceSpot> = group_of_4
+                    .into_iter()
+                    .map(|&indexes| self.access(indexes))
+                    .collect();
+                if !group_of_4.iter().any(|elm| elm.is_empty())
+                    && group_of_4[0] == group_of_4[1]
                     && group_of_4[1] == group_of_4[2]
                     && group_of_4[2] == group_of_4[3]
                 {
-                    return true;
+                    return match group_of_4[0] {
+                        PieceSpot::Player(player) => Some(player),
+                        PieceSpot::Empty => unreachable!(),
+                    };
                 }
             }
         }
 
-        false
+        None
     }
 
     pub fn calculate_result(&self) -> GameResult {
-        if self.is_draw() {
+        if let Some(player) = self.is_win() {
+            GameResult::Win(player)
+        } else if self.is_draw() {
             GameResult::Draw
-        } else if self.is_win() {
-            GameResult::Win(self.turn)
         } else {
             GameResult::Indefinite
         }
