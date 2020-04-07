@@ -1,5 +1,7 @@
+use std::fmt;
+
 #[derive(Clone, Copy, Debug)]
-enum Player {
+pub enum Player {
     A,
     B,
 }
@@ -11,6 +13,15 @@ impl Player {
             Self::B => Self::A,
         }
     }
+
+    /*
+        fn to_color(&self) -> Color {
+            match self {
+                Self::A => Color::from_rgb8(200, 30, 50),
+                Self::B => Color::from_rgb8(150, 80, 35),
+            }
+        }
+    */
 }
 
 impl Default for Player {
@@ -19,33 +30,70 @@ impl Default for Player {
     }
 }
 
+impl fmt::Display for Player {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &self {
+            Self::A => write!(f, "Player A (Red)"),
+            Self::B => write!(f, "Player B (Yellow)"),
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
-enum GameResult {
+pub enum GameResult {
     Indefinite,
     Win(Player),
     Draw,
 }
 
+#[derive(Clone, Copy, Debug)]
+pub enum PieceSpot {
+    Empty,
+    Player(Player),
+}
+
+impl Default for PieceSpot {
+    fn default() -> Self {
+        Self::Empty
+    }
+}
+
+impl PieceSpot {
+    fn is_empty(&self) -> bool {
+        match self {
+            Self::Empty => true,
+            _ => false,
+        }
+    }
+    fn is_player(&self) -> bool {
+        match self {
+            Self::Player(_) => true,
+            _ => false,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Default)]
-struct Board {
-    turn: Player,
-    board: [[Option<Player>; 6]; 7],
+pub struct Board {
+    pub turn: Player,
+    pub board: [[PieceSpot; 6]; 7],
 }
 
 impl Board {
-    fn new(turn: Player) -> Self {
-        Self {
-            turn,
-            board: [[None; 6]; 7],
-        }
+    fn reset(mut self) {
+        self = Self::default();
     }
 
-    fn put_piece(&mut self, column: usize, player: Player) {
-        let column_top = self.board[column].iter().filter(|&x| x.is_some()).count();
+    fn drop_piece(&mut self, column: usize) {
+        let column_top = self.board[column].iter().filter(|&x| x.is_player()).count();
         if column >= 7 || column_top >= 6 {
             panic!("invalid column");
         }
-        self.board[column][column_top] = Some(player);
+        self.board[column][column_top] = PieceSpot::Player(self.turn);
+    }
+
+    fn switch_turn(&mut self) {
+        self.turn = self.turn.opposite();
     }
 
     fn win_sequences(&self) -> Vec<Vec<(usize, usize)>> {
@@ -98,29 +146,39 @@ impl Board {
         rows.chain(columns).chain(diag1).chain(diag2).collect()
     }
 
-    fn calculate_result(&self) -> GameResult {
-        fn eq_4<T: PartialEq>(vec: Vec<T>) -> bool {
-            a == b && b == c && c == d
-        }
-        let none_count = self
+    fn is_draw(&self) -> bool {
+        let empty_count = self
+            .board
             .iter()
             .flatten()
-            .filter(|option| option.is_none())
+            .filter(|option| option.is_empty())
             .count();
-        if none_count == 0 {
-            return GameResult::Draw;
-        }
 
-        for sequence in self.win_sequences {
-            for group_of_4 in sequence.windows(4) {}
-        }
+        empty_count == 0
     }
-}
 
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
+    fn is_win(&self) -> bool {
+        for sequence in self.win_sequences() {
+            for group_of_4 in sequence.windows(4) {
+                if group_of_4[0] == group_of_4[1]
+                    && group_of_4[1] == group_of_4[2]
+                    && group_of_4[2] == group_of_4[3]
+                {
+                    return true;
+                }
+            }
+        }
+
+        false
+    }
+
+    pub fn calculate_result(&self) -> GameResult {
+        if self.is_draw() {
+            GameResult::Draw
+        } else if self.is_win() {
+            GameResult::Win(self.turn)
+        } else {
+            GameResult::Indefinite
+        }
     }
 }
