@@ -7,21 +7,12 @@ pub enum Player {
 }
 
 impl Player {
-    fn opposite(&self) -> Self {
+    fn opposite(self) -> Self {
         match self {
             Self::A => Self::B,
             Self::B => Self::A,
         }
     }
-
-    /*
-        fn to_color(&self) -> Color {
-            match self {
-                Self::A => Color::from_rgb8(200, 30, 50),
-                Self::B => Color::from_rgb8(150, 80, 35),
-            }
-        }
-    */
 }
 
 impl Default for Player {
@@ -59,13 +50,13 @@ impl Default for PieceSpot {
 }
 
 impl PieceSpot {
-    fn is_empty(&self) -> bool {
+    fn is_empty(self) -> bool {
         match self {
             Self::Empty => true,
             _ => false,
         }
     }
-    fn is_player(&self) -> bool {
+    fn is_player(self) -> bool {
         match self {
             Self::Player(_) => true,
             _ => false,
@@ -84,12 +75,14 @@ impl Board {
         *self = Self::default();
     }
 
-    pub fn drop_piece(&mut self, column: usize) {
+    pub fn drop_piece(&mut self, column: usize) -> Result<(), ()> {
         let column_top = self.board[column].iter().filter(|&x| x.is_player()).count();
         if column >= 7 || column_top >= 6 {
-            panic!("invalid column");
+            Err(())
+        } else {
+            self.board[column][column_top] = PieceSpot::Player(self.turn);
+            Ok(())
         }
-        self.board[column][column_top] = PieceSpot::Player(self.turn);
     }
 
     fn access(&self, (column, row): (usize, usize)) -> PieceSpot {
@@ -165,7 +158,7 @@ impl Board {
         for sequence in Self::win_sequences() {
             for group_of_4 in sequence.windows(4) {
                 let group_of_4: Vec<PieceSpot> = group_of_4
-                    .into_iter()
+                    .iter()
                     .map(|&indexes| self.access(indexes))
                     .collect();
                 if !group_of_4.iter().any(|elm| elm.is_empty())

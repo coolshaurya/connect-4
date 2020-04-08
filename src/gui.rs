@@ -42,7 +42,7 @@ impl Board {
         };
         let mut row = Row::new().spacing(INTERCOLUMN_SPACING);
         for i in 0..7 {
-            let mut column = Column::new().spacing(2);
+            let mut column = Column::new().spacing(INTERCOLUMN_SPACING);
             for j in (0..6).rev() {
                 column = column.push(circle().style(self.board[i][j]));
             }
@@ -120,10 +120,10 @@ impl Sandbox for BoardGui {
     }
 
     fn view(&mut self) -> Element<Self::Message> {
-        let result = match self.board.calculate_result() {
-            GameResult::Indefinite => format!("Turn: {}", self.board.turn),
-            GameResult::Draw => String::from("It's a Draw!"),
-            GameResult::Win(player) => format!("{} Won!", player),
+        let (result_text, result_size) = match self.board.calculate_result() {
+            GameResult::Indefinite => (format!("Turn: {}", self.board.turn), 25),
+            GameResult::Draw => (String::from("It's a Draw!"), 80),
+            GameResult::Win(player) => (format!("{} Won!", player), 80),
         };
 
         let reset_button = Button::new(
@@ -139,7 +139,7 @@ impl Sandbox for BoardGui {
             .align_items(Align::Center)
             .push(Text::new(HEADING).size(80).color(colors::HEADING))
             .push(Text::new(INSTRUCTIONS).width(Length::Units(600)))
-            .push(Text::new(result))
+            .push(Text::new(result_text).size(result_size))
             .push(
                 Row::with_children(self.drop_buttons.iter_mut().map(|btn| btn.view()).collect())
                     .spacing(INTERCOLUMN_SPACING),
@@ -153,9 +153,11 @@ impl Sandbox for BoardGui {
         match message {
             Message::PieceDrop(column) => {
                 if !self.game_over {
-                    self.board.drop_piece(column);
-                    if let Indefinite = self.board.calculate_result() {
-                        self.board.switch_turn();
+                    let valid_drop = self.board.drop_piece(column);
+                    if let GameResult::Indefinite = self.board.calculate_result() {
+                        if valid_drop.is_ok() {
+                            self.board.switch_turn();
+                        }
                     } else {
                         self.game_over = true;
                     }
